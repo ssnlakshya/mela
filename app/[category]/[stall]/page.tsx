@@ -1,12 +1,13 @@
 "use client";
 
-import { use } from "react";
+import { use, useState } from "react";
 import { notFound } from "next/navigation";
 import { getStallBySlug } from "@/lib/data";
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { ArrowLeft, Phone, Instagram, MapPin, Tag } from "lucide-react";
+import { ArrowLeft, Phone, Instagram, MapPin, Tag, ZoomIn } from "lucide-react";
+import ImageViewer from "@/components/ui/image-viewer";
 
 type PageProps = {
     params: Promise<{ category: string; stall: string }>;
@@ -14,6 +15,8 @@ type PageProps = {
 
 export default function StallPage({ params }: PageProps) {
     const { category, stall: stallSlug } = use(params);
+    const [viewerOpen, setViewerOpen] = useState(false);
+    const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
     const stallData = getStallBySlug(stallSlug);
 
@@ -21,15 +24,21 @@ export default function StallPage({ params }: PageProps) {
         return notFound();
     }
 
-    // Ensure stall category matches route
-    if (stallData.category !== category) {
-        // Optional: Redirect or just show it anyway. 
-        // For strictness we could return notFound() if categories don't match, 
-        // but unique slugs make it safe to just render.
-    }
+    const openViewer = (index: number) => {
+        setCurrentImageIndex(index);
+        setViewerOpen(true);
+    };
 
     return (
         <div className="min-h-screen bg-white text-neutral-900 font-sans">
+            {/* Image Viewer Overlay */}
+            <ImageViewer
+                isOpen={viewerOpen}
+                onClose={() => setViewerOpen(false)}
+                images={stallData.images}
+                initialIndex={currentImageIndex}
+            />
+
             {/* Hero Banner */}
             <div className="relative h-[50vh] w-full bg-neutral-900">
                 <Image
@@ -41,8 +50,8 @@ export default function StallPage({ params }: PageProps) {
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
 
-                {/* Navigation */}
-                <div className="absolute top-8 left-8 md:left-12 z-20">
+                {/* Navigation - Adjusted top spacing for fixed header */}
+                <div className="absolute top-24 left-8 md:left-12 z-20">
                     <Link
                         href={`/${category}`}
                         className="inline-flex items-center text-white/80 hover:text-white transition-colors bg-black/20 hover:bg-black/40 px-4 py-2 rounded-full backdrop-blur-sm"
@@ -95,14 +104,21 @@ export default function StallPage({ params }: PageProps) {
                                     initial={{ opacity: 0, scale: 0.95 }}
                                     whileInView={{ opacity: 1, scale: 1 }}
                                     viewport={{ once: true }}
-                                    className={`relative rounded-2xl overflow-hidden h-64 shadow-lg hover:shadow-xl transition-shadow ${idx === 0 && stallData.images.length > 2 ? 'md:col-span-2 md:h-80' : ''}`}
+                                    onClick={() => openViewer(idx)}
+                                    className={`relative group rounded-2xl overflow-hidden h-64 shadow-lg hover:shadow-xl transition-shadow cursor-zoom-in ${idx === 0 && stallData.images.length > 2 ? 'md:col-span-2 md:h-80' : ''}`}
                                 >
                                     <Image
                                         src={img}
                                         alt={`Gallery image ${idx + 1}`}
                                         fill
-                                        className="object-cover hover:scale-105 transition-transform duration-500"
+                                        className="object-cover group-hover:scale-105 transition-transform duration-500"
                                     />
+                                    {/* Hover Overlay with Icon */}
+                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                        <div className="bg-white/20 backdrop-blur-md p-3 rounded-full text-white">
+                                            <ZoomIn className="w-6 h-6" />
+                                        </div>
+                                    </div>
                                 </motion.div>
                             ))}
                         </div>
@@ -113,7 +129,7 @@ export default function StallPage({ params }: PageProps) {
                 <div className="space-y-8">
 
                     {/* Owner Details Card */}
-                    <div className="bg-neutral-50 p-6 rounded-2xl border border-neutral-100 shadow-xl sticky top-8">
+                    <div className="bg-neutral-50 p-6 rounded-2xl border border-neutral-100 shadow-xl">
                         <h3 className="text-xl font-bold mb-6 border-b pb-2">Stall Owner</h3>
                         <div className="space-y-4">
                             <div className="flex items-center gap-3 text-lg font-medium">
@@ -164,3 +180,4 @@ export default function StallPage({ params }: PageProps) {
         </div>
     );
 }
+
