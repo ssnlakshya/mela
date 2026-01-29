@@ -1,15 +1,5 @@
-import Image from "next/image";
+import StallView from "@/components/stall/StallView";
 
-type PageProps = {
-  params: { slug: string };
-};
-
-export default function Page({ params }: PageProps) {
-  const { slug } = params;
-
-  return (
-    <div>
-      
-    </div>
-  );
+export default function Page() {
+  return <StallView />;
 }
