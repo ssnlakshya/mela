@@ -17,6 +17,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Lakshya Mela",
   description: "Created with ❤️ by the Lakshya Tech Team",
+  icons: {
+    icon: "/lakshya.png",
+  },
 };
 
 export default function RootLayout({
