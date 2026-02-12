@@ -1,10 +1,8 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { notFound } from "next/navigation";
-import { getStallBySlug } from "@/lib/data";
 import Link from "next/link";
-import Image from "next/image";
 import { motion } from "framer-motion";
 import { ArrowLeft, Phone, Instagram, MapPin, ZoomIn, Sparkles, Trophy, MessageCircle, Star, Gift, QrCode } from "lucide-react";
 import ImageViewer from "@/components/ui/image-viewer";
@@ -17,12 +15,75 @@ export default function StallPage({ params }: PageProps) {
     const { category, stall: stallSlug } = use(params);
     const [viewerOpen, setViewerOpen] = useState(false);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
+    const [stallData, setStallData] = useState<any | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-    const stallData = getStallBySlug(stallSlug);
+    useEffect(() => {
+        const loadStall = async () => {
+            try {
+                setIsLoading(true);
+                const response = await fetch(`/api/public/stalls/${stallSlug}`);
+                if (!response.ok) {
+                    throw new Error("Failed to load stall");
+                }
+                const data = await response.json();
+                if (!data.stall) {
+                    setStallData(null);
+                } else {
+                    setStallData(data.stall);
+                }
+            } catch (error) {
+                setErrorMessage(error instanceof Error ? error.message : "Failed to load stall");
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        void loadStall();
+    }, [stallSlug]);
+
+    if (isLoading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center text-neutral-600">
+                Loading stall...
+            </div>
+        );
+    }
+
+    if (errorMessage) {
+        return (
+            <div className="min-h-screen flex items-center justify-center text-neutral-600">
+                {errorMessage}
+            </div>
+        );
+    }
 
     if (!stallData) {
         return notFound();
     }
+
+    const heroImage = stallData.bannerImage?.trim()
+        ? stallData.bannerImage
+        : "/images/food.png";
+    const galleryImages = Array.isArray(stallData.images) && stallData.images.length > 0
+        ? stallData.images.filter(Boolean)
+        : heroImage
+            ? [heroImage]
+            : [];
+    const bucketBase = process.env.NEXT_PUBLIC_R2_BUCKET_URL?.replace(/\/$/, "");
+    const toMediaUrl = (value: string) => {
+        if (!bucketBase) return value;
+        if (value.startsWith(bucketBase)) {
+            const key = value.slice(bucketBase.length + 1);
+            return `/api/media?key=${encodeURIComponent(key)}`;
+        }
+        return value;
+    };
+
+    const isRemoteUrl = (value: string) => value.startsWith("http://") || value.startsWith("https://");
+    const heroSrc = toMediaUrl(heroImage);
+    const viewerImages = galleryImages.map(toMediaUrl);
 
     const openViewer = (index: number) => {
         setCurrentImageIndex(index);
@@ -35,18 +96,16 @@ export default function StallPage({ params }: PageProps) {
             <ImageViewer
                 isOpen={viewerOpen}
                 onClose={() => setViewerOpen(false)}
-                images={stallData.images}
+                images={viewerImages}
                 initialIndex={currentImageIndex}
             />
 
             {/* Hero Banner */}
             <div className="relative h-[50vh] w-full bg-neutral-900">
-                <Image
-                    src={stallData.bannerImage}
+                <img
+                    src={heroSrc}
                     alt={stallData.name}
-                    fill
-                    className="object-cover opacity-80"
-                    priority
+                    className="h-full w-full object-cover opacity-80"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
 
@@ -74,9 +133,11 @@ export default function StallPage({ params }: PageProps) {
                         <span className="bg-orange-600 px-3 py-1 rounded-full text-sm font-semibold uppercase tracking-wider">
                             {stallData.category}
                         </span>
-                        <span className="flex items-center gap-2">
-                            <MapPin className="w-4 h-4" /> Stall No. {stallData.id}
-                        </span>
+                        {stallData.stallNumber && (
+                            <span className="flex items-center gap-2">
+                                <MapPin className="w-4 h-4" /> Stall No. {stallData.stallNumber}
+                            </span>
+                        )}
                     </div>
                 </div>
             </div>
@@ -98,20 +159,25 @@ export default function StallPage({ params }: PageProps) {
                     <section>
                         <h2 className="text-3xl font-bold mb-6">Gallery</h2>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {stallData.images.map((img, idx) => (
+                            {galleryImages.map((img, idx) => (
                                 <motion.div
                                     key={idx}
                                     initial={{ opacity: 0, scale: 0.95 }}
                                     whileInView={{ opacity: 1, scale: 1 }}
                                     viewport={{ once: true }}
                                     onClick={() => openViewer(idx)}
-                                    className={`relative group rounded-2xl overflow-hidden h-64 shadow-lg hover:shadow-xl transition-shadow cursor-zoom-in ${idx === 0 && stallData.images.length > 2 ? 'md:col-span-2 md:h-80' : ''}`}
+                                    className={`relative group rounded-2xl overflow-hidden h-64 shadow-lg hover:shadow-xl transition-shadow cursor-zoom-in ${idx === 0 && galleryImages.length > 2 ? 'md:col-span-2 md:h-80' : ''}`}
                                 >
-                                    <Image
-                                        src={img}
+                                    <img
+                                        src={toMediaUrl(img)}
                                         alt={`Gallery image ${idx + 1}`}
-                                        fill
-                                        className="object-cover group-hover:scale-105 transition-transform duration-500"
+                                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                        onError={(event) => {
+                                            const target = event.currentTarget;
+                                            if (target.dataset.fallbackApplied === "true") return;
+                                            target.dataset.fallbackApplied = "true";
+                                            target.src = heroSrc;
+                                        }}
                                     />
                                     {/* Hover Overlay with Icon */}
                                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">

@@ -5,6 +5,7 @@ export type Stall = {
     category: "food" | "accessories" | "games";
     description: string;
     bannerImage: string;
+    logoImage?: string;
     images: string[];
     ownerName: string;
     ownerPhone: string;
@@ -16,7 +17,12 @@ export type Stall = {
     offers?: string[];
     availableAt?: string[];
     stallNumber?: string;
-    paymentMethods?: string[];
+    paymentMethods?: string[]; // payment modes only
+    limitedTimeOffers?: {
+        title: string;
+        description?: string;
+        validTill?: string;
+    }[];
 };
 
 export const stalls: Stall[] = [

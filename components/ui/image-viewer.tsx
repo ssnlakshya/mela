@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ChevronLeft, ChevronRight, Download } from "lucide-react";
-import Image from "next/image";
 
 interface ImageViewerProps {
     images: string[];
@@ -85,12 +84,10 @@ export default function ImageViewer({
                         className="relative w-full max-w-3xl aspect-[4/3] rounded-lg overflow-hidden shadow-2xl bg-transparent"
                         onClick={(e) => e.stopPropagation()} // Prevent close when clicking image itself
                     >
-                        <Image
+                        <img
                             src={images[currentIndex]}
                             alt={`View ${currentIndex + 1}`}
-                            fill
-                            className="object-contain"
-                            priority
+                            className="h-full w-full object-contain"
                         />
                     </motion.div>
                     {/* Navigation Arrows */}
@@ -116,11 +113,10 @@ export default function ImageViewer({
                                 className={`relative w-16 h-16 rounded-md overflow-hidden border-2 transition-all flex-shrink-0 ${idx === currentIndex ? "border-white scale-110" : "border-transparent opacity-50 hover:opacity-100"
                                     }`}
                             >
-                                <Image
+                                <img
                                     src={img}
                                     alt={`Thumbnail ${idx}`}
-                                    fill
-                                    className="object-cover"
+                                    className="h-full w-full object-cover"
                                 />
                             </button>
                         ))}

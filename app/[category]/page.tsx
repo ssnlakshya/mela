@@ -1,12 +1,10 @@
 "use client";
 
-import { notFound, usePathname, useRouter } from "next/navigation";
-import { getStallsByCategory } from "@/lib/data";
+import { notFound } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react"; // Assuming lucide-react is installed as seen in package.json
-import { use } from "react";
+import { use, useEffect, useState } from "react";
 
 type PageProps = {
     params: Promise<{ category: string }>;
@@ -25,8 +23,61 @@ export default function CategoryPage({ params }: PageProps) {
         return notFound();
     }
 
-    const stalls = getStallsByCategory(category);
+    const [stalls, setStalls] = useState<Array<{
+        name: string;
+        slug: string;
+        category: string;
+        description: string;
+        bannerImage: string;
+        logoImage?: string;
+        ownerName: string;
+    }>>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+    useEffect(() => {
+        const loadStalls = async () => {
+            try {
+                setIsLoading(true);
+                const response = await fetch(`/api/public/stalls?category=${category}`);
+                if (!response.ok) {
+                    throw new Error("Failed to load stalls");
+                }
+                const data = await response.json();
+                setStalls(data.stalls ?? []);
+            } catch (error) {
+                setErrorMessage(error instanceof Error ? error.message : "Failed to load stalls");
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        void loadStalls();
+    }, [category]);
     const title = category.charAt(0).toUpperCase() + category.slice(1);
+
+    const getFallbackBanner = (cat: string) => {
+        switch (cat.toLowerCase()) {
+            case "accessories":
+                return "/images/accessories.png";
+            case "games":
+                return "/images/games.png";
+            default:
+                return "/images/food.png";
+        }
+    };
+
+    const bucketBase = process.env.NEXT_PUBLIC_R2_BUCKET_URL?.replace(/\/$/, "");
+    const toMediaUrl = (value: string) => {
+        if (!bucketBase) return value;
+        if (value.startsWith(bucketBase)) {
+            const key = value.slice(bucketBase.length + 1);
+            return `/api/media?key=${encodeURIComponent(key)}`;
+        }
+        return value;
+    };
+
+    const isRemoteUrl = (value: string) => value.startsWith("http://") || value.startsWith("https://");
 
     return (
         <div className="min-h-screen bg-white text-neutral-900 p-8 md:p-12">
@@ -60,8 +111,11 @@ export default function CategoryPage({ params }: PageProps) {
 
                 {/* Stalls Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    {stalls.map((stall, index) => (
-                        <Link key={stall.id} href={`/${category}/${stall.slug}`}>
+                    {stalls.map((stall, index) => {
+                        const image = stall.logoImage?.trim() || stall.bannerImage?.trim() || getFallbackBanner(category);
+                        const imageSrc = toMediaUrl(image);
+                        return (
+                        <Link key={stall.slug} href={`/${category}/${(stall.slug ?? "").toLowerCase()}`}>
                             <motion.div
                                 initial={{ opacity: 0, scale: 0.9 }}
                                 animate={{ opacity: 1, scale: 1 }}
@@ -70,11 +124,10 @@ export default function CategoryPage({ params }: PageProps) {
                                 className="group relative h-96 w-full rounded-2xl overflow-hidden cursor-pointer shadow-2xl"
                             >
                                 {/* Background Image */}
-                                <Image
-                                    src={stall.bannerImage}
+                                <img
+                                    src={imageSrc}
                                     alt={stall.name}
-                                    fill
-                                    className="object-cover transition-transform duration-500 group-hover:scale-110"
+                                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
                                 />
 
                                 {/* Overlay Gradient */}
@@ -101,10 +154,22 @@ export default function CategoryPage({ params }: PageProps) {
                                 </div>
                             </motion.div>
                         </Link>
-                    ))}
+                    )})}
                 </div>
 
-                {stalls.length === 0 && (
+                {isLoading && (
+                    <div className="text-center py-20">
+                        <h2 className="text-2xl text-neutral-400">Loading stalls...</h2>
+                    </div>
+                )}
+
+                {!isLoading && errorMessage && (
+                    <div className="text-center py-20">
+                        <h2 className="text-2xl text-neutral-400">{errorMessage}</h2>
+                    </div>
+                )}
+
+                {!isLoading && !errorMessage && stalls.length === 0 && (
                     <div className="text-center py-20">
                         <h2 className="text-2xl text-neutral-400">No stalls found in this category yet.</h2>
                     </div>
