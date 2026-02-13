@@ -84,6 +84,8 @@ export default function StallPage({ params }: PageProps) {
     const isRemoteUrl = (value: string) => value.startsWith("http://") || value.startsWith("https://");
     const heroSrc = toMediaUrl(heroImage);
     const viewerImages = galleryImages.map(toMediaUrl);
+    const displayImages = galleryImages.slice(0, 3);
+    const remainingImageCount = Math.max(galleryImages.length - displayImages.length, 0);
 
     const openViewer = (index: number) => {
         setCurrentImageIndex(index);
@@ -159,7 +161,7 @@ export default function StallPage({ params }: PageProps) {
                     <section>
                         <h2 className="text-3xl font-bold mb-6">Gallery</h2>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {galleryImages.map((img, idx) => (
+                            {displayImages.map((img, idx) => (
                                 <motion.div
                                     key={idx}
                                     initial={{ opacity: 0, scale: 0.95 }}
@@ -185,6 +187,11 @@ export default function StallPage({ params }: PageProps) {
                                             <ZoomIn className="w-6 h-6" />
                                         </div>
                                     </div>
+                                    {idx === 2 && remainingImageCount > 0 && (
+                                        <div className="absolute inset-0 bg-black/55 flex items-center justify-center">
+                                            <span className="text-white text-2xl font-semibold">+{remainingImageCount}</span>
+                                        </div>
+                                    )}
                                 </motion.div>
                             ))}
                         </div>
