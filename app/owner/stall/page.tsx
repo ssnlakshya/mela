@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { ALLOWED_OWNER_EMAILS } from "@/lib/auth/allowlist";
 import { ItemCard } from "./ItemCard";
+import { ReviewCard } from "./ReviewCard";
+import { LimitedOfferCard } from "./LimitedOfferCard";
 
 const initialFormState = {
   name: "",
@@ -173,6 +175,14 @@ export default function StallOwnerPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [showDetails, setShowDetails] = useState(true);
+  const [reviewsArr, setReviewsArr] = useState<Review[]>([
+    { user: "", rating: 5, comment: "" },
+  ]);
+
+  const [limitedOffersArr, setLimitedOffersArr] = useState<LimitedOffer[]>([
+    { title: "", description: "", validTill: "" },
+  ]);
+
   const isUploading =
     bannerStatus === "uploading" ||
     logoStatus === "uploading" ||
@@ -219,6 +229,64 @@ export default function StallOwnerPage() {
     items
       .map((i) => ({ name: i.name.trim(), price: i.price.trim() }))
       .filter((i) => i.name.length > 0 && i.price.length > 0);
+
+  const handleReviewChange = (
+    index: number,
+    field: "user" | "rating" | "comment",
+    value: string
+  ) => {
+    setReviewsArr((prev) => {
+      const next = [...prev];
+      if (field === "rating") {
+        next[index] = { ...next[index], rating: Number(value) };
+      } else {
+        next[index] = { ...next[index], [field]: value } as Review;
+      }
+      return next;
+    });
+  };
+
+  const addReview = () =>
+    setReviewsArr((prev) => [...prev, { user: "", rating: 5, comment: "" }]);
+
+  const removeReview = (index: number) =>
+    setReviewsArr((prev) => (prev.length === 1 ? prev : prev.filter((_, i) => i !== index)));
+
+  const normalizeReviews = (arr: Review[]) =>
+    arr
+      .map((r) => ({
+        user: r.user.trim(),
+        rating: Number(r.rating),
+        comment: (r.comment ?? "").trim(),
+      }))
+      .filter((r) => r.user && Number.isFinite(r.rating) && r.rating >= 0 && r.rating <= 5);
+
+  const handleOfferChange = (
+    index: number,
+    field: "title" | "description" | "validTill",
+    value: string
+  ) => {
+    setLimitedOffersArr((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
+  };
+
+  const addOffer = () =>
+    setLimitedOffersArr((prev) => [...prev, { title: "", description: "", validTill: "" }]);
+
+  const removeOffer = (index: number) =>
+    setLimitedOffersArr((prev) => (prev.length === 1 ? prev : prev.filter((_, i) => i !== index)));
+
+  const normalizeOffers = (arr: LimitedOffer[]) =>
+    arr
+      .map((o) => ({
+        title: o.title.trim(),
+        description: o.description?.trim() || undefined,
+        validTill: o.validTill?.trim() || undefined,
+      }))
+      .filter((o) => o.title.length > 0);
 
   useEffect(() => {
     const loadSession = async () => {
@@ -311,6 +379,14 @@ export default function StallOwnerPage() {
             });
 
             setMenuItems(itemsValue.length ? itemsValue : [{ name: "", price: "" }]);
+
+            setReviewsArr(
+              reviewsValue.length ? reviewsValue : [{ user: "", rating: 5, comment: "" }]
+            );
+
+            setLimitedOffersArr(
+              limitedTimeOffersValue.length ? limitedTimeOffersValue : [{ title: "", description: "", validTill: "" }]
+            );
 
             if (payload.slug) {
               setOriginalSlug(payload.slug.trim().toLowerCase());
@@ -593,8 +669,8 @@ export default function StallOwnerPage() {
         availableAt: parseCsv(formValues.availableAt),
         stallNumber: formValues.stallNumber.trim() || undefined,
         paymentMethods: parseCsv(formValues.paymentMethods),
-        limitedTimeOffers: parseLimitedOffers(formValues.limitedTimeOffers),
-        reviews: parseReviews(formValues.reviews),
+        reviews: normalizeReviews(reviewsArr),
+        limitedTimeOffers: normalizeOffers(limitedOffersArr),
       };
 
       const response = await fetch("/api/stalls", {
@@ -710,7 +786,7 @@ export default function StallOwnerPage() {
           <button
             type="button"
             onClick={() => setShowDetails((prev) => !prev)}
-            className="flex items-center gap-4 rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm transition hover:border-orange-200"
+            className="flex items-center gap-4 rounded-2xl border border-neutral-100 bg-white p-4 shadow-md shadow-orange-400/50 transition hover:border-orange-200"
           >
             <div className="h-14 w-14 overflow-hidden rounded-2xl border border-neutral-200 bg-neutral-50">
               {logoPreview || logoUrl ? (
@@ -746,11 +822,11 @@ export default function StallOwnerPage() {
             onSubmit={handleSubmit}
           >
             <section className="lg:col-span-2 space-y-6">
-            <div className="rounded-2xl border border-neutral-100 bg-white p-6 shadow-sm">
+            <div className="rounded-2xl border border-neutral-100 bg-white p-6 shadow-md shadow-orange-400/50">
               <h2 className="text-xl font-semibold text-neutral-900">Stall info</h2>
               <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
-                  <label className="text-sm font-medium text-neutral-700" htmlFor="name">
+                  <label className="text-sm font-medium text-orange-700" htmlFor="name">
                     Stall name *
                   </label>
                   <input
@@ -763,7 +839,7 @@ export default function StallOwnerPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-neutral-900" htmlFor="slug">
+                  <label className="text-sm font-medium text-orange-700" htmlFor="slug">
                     Short link *
                   </label>
                   <input
@@ -790,7 +866,7 @@ export default function StallOwnerPage() {
                   </p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-neutral-700" htmlFor="category">
+                  <label className="text-sm font-medium text-orange-700" htmlFor="category">
                     Category *
                   </label>
                   <select
@@ -806,7 +882,7 @@ export default function StallOwnerPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-neutral-700" htmlFor="stallNumber">
+                  <label className="text-sm font-medium text-orange-700" htmlFor="stallNumber">
                     Stall number
                   </label>
                   <input
@@ -821,7 +897,7 @@ export default function StallOwnerPage() {
               </div>
               <div className="mt-4">
                 <label
-                  className="text-sm font-medium text-neutral-700"
+                  className="text-sm font-medium text-orange-700"
                   htmlFor="description"
                 >
                   Description *
@@ -838,11 +914,11 @@ export default function StallOwnerPage() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-neutral-100 bg-white p-6 shadow-sm">
+            <div className="rounded-2xl border border-neutral-100 bg-white p-6 shadow-md shadow-orange-400/50">
               <h2 className="text-xl font-semibold text-neutral-900">Owner details</h2>
               <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
-                  <label className="text-sm font-medium text-neutral-700" htmlFor="ownerName">
+                  <label className="text-sm font-medium text-orange-700" htmlFor="ownerName">
                     Owner name *
                   </label>
                   <input
@@ -855,7 +931,7 @@ export default function StallOwnerPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-neutral-700" htmlFor="ownerPhone">
+                  <label className="text-sm font-medium text-orange-700" htmlFor="ownerPhone">
                     Owner phone *
                   </label>
                   <input
@@ -868,7 +944,7 @@ export default function StallOwnerPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-neutral-700" htmlFor="instagram">
+                  <label className="text-sm font-medium text-orange-700" htmlFor="instagram">
                     Instagram
                   </label>
                   <input
@@ -881,7 +957,7 @@ export default function StallOwnerPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-neutral-700" htmlFor="paymentMethods">
+                  <label className="text-sm font-medium text-orange-700" htmlFor="paymentMethods">
                     Payment methods (modes only)
                   </label>
                   <input
@@ -896,19 +972,19 @@ export default function StallOwnerPage() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-neutral-100 bg-white p-6 shadow-sm">
+            <div className="rounded-2xl border border-neutral-100 bg-white p-6 shadow-md shadow-orange-400/50">
               <h2 className="text-xl font-semibold text-neutral-900">Menu and extras</h2>
               <div className="mt-4 space-y-4">
                 <div>
                   <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium text-neutral-700">
+                    <label className="text-sm font-medium text-orange-700">
                       Items
                     </label>
 
                     <button
                       type="button"
                       onClick={addMenuItem}
-                      className="rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 shadow-sm transition hover:border-orange-300 hover:text-orange-600"
+                      className="rounded-full border border-orange-300 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 shadow-sm transition hover:border-orange-300 hover:text-orange-600"
                     >
                       + Add item
                     </button>
@@ -934,7 +1010,7 @@ export default function StallOwnerPage() {
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
-                    <label className="text-sm font-medium text-neutral-700" htmlFor="highlights">
+                    <label className="text-sm font-medium text-orange-700" htmlFor="highlights">
                       Highlights
                     </label>
                     <textarea
@@ -948,7 +1024,7 @@ export default function StallOwnerPage() {
                     />
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-neutral-700" htmlFor="bestSellers">
+                    <label className="text-sm font-medium text-orange-700" htmlFor="bestSellers">
                       Best sellers
                     </label>
                     <textarea
@@ -964,7 +1040,7 @@ export default function StallOwnerPage() {
                 </div>
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
-                    <label className="text-sm font-medium text-neutral-700" htmlFor="offers">
+                    <label className="text-sm font-medium text-orange-700" htmlFor="offers">
                       Offers
                     </label>
                     <textarea
@@ -978,7 +1054,7 @@ export default function StallOwnerPage() {
                     />
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-neutral-700" htmlFor="availableAt">
+                    <label className="text-sm font-medium text-orange-700" htmlFor="availableAt">
                       Available at
                     </label>
                     <textarea
@@ -993,39 +1069,63 @@ export default function StallOwnerPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-neutral-700" htmlFor="reviews">
-                    Reviews (user - rating - comment)
-                  </label>
-                  <textarea
-                    id="reviews"
-                    name="reviews"
-                    value={formValues.reviews}
-                    onChange={handleInputChange}
-                    rows={3}
-                    placeholder="Aditi S. - 5 - Best pani puri"
-                    className="mt-2 w-full text-neutral-900 rounded-xl border border-neutral-200 px-4 py-3 text-sm shadow-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
-                  />
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium text-orange-700">Reviews</label>
+
+                    <button
+                      type="button"
+                      onClick={addReview}
+                      className="rounded-full border border-orange-300 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 shadow-sm transition hover:border-orange-400 hover:text-orange-700"
+                    >
+                      + Add review
+                    </button>
+                  </div>
+
+                  <div className="mt-3 space-y-3">
+                    {reviewsArr.map((review, index) => (
+                      <ReviewCard
+                        key={index}
+                        review={review}
+                        index={index}
+                        onChange={handleReviewChange}
+                        onRemove={removeReview}
+                        canRemove={reviewsArr.length > 1}
+                      />
+                    ))}
+                  </div>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-neutral-700" htmlFor="limitedTimeOffers">
-                    Limited time offers (title - description - valid till)
-                  </label>
-                  <textarea
-                    id="limitedTimeOffers"
-                    name="limitedTimeOffers"
-                    value={formValues.limitedTimeOffers}
-                    onChange={handleInputChange}
-                    rows={3}
-                    placeholder="Weekend Combo - Discounted snack box - 2026-03-01"
-                    className="mt-2 w-full text-neutral-900 rounded-xl border border-neutral-200 px-4 py-3 text-sm shadow-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
-                  />
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium text-orange-700">Limited time offers</label>
+
+                    <button
+                      type="button"
+                      onClick={addOffer}
+                      className="rounded-full border border-orange-300 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 shadow-sm transition hover:border-orange-300 hover:text-orange-600"
+                    >
+                      + Add offer
+                    </button>
+                  </div>
+
+                  <div className="mt-3 space-y-3">
+                    {limitedOffersArr.map((offer, index) => (
+                      <LimitedOfferCard
+                        key={index}
+                        offer={offer}
+                        index={index}
+                        onChange={handleOfferChange}
+                        onRemove={removeOffer}
+                        canRemove={limitedOffersArr.length > 1}
+                      />
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
           </section>
 
           <aside className="space-y-6">
-            <div className="rounded-2xl border border-neutral-100 bg-white p-6 shadow-sm">
+            <div className="rounded-2xl border border-neutral-100 bg-white p-6 shadow-md shadow-orange-400/50">
               <h2 className="text-xl font-semibold text-neutral-900">Images</h2>
               <div className="mt-4 space-y-4">
                 <div>
@@ -1179,7 +1279,7 @@ export default function StallOwnerPage() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-neutral-100 bg-white p-6 shadow-sm">
+            <div className="rounded-2xl border border-neutral-100 bg-white p-6 shadow-md shadow-orange-400/50">
               <h2 className="text-xl font-semibold text-neutral-900">Actions</h2>
               <div className="mt-4 space-y-3">
                 <button
@@ -1192,7 +1292,7 @@ export default function StallOwnerPage() {
                 <button
                   type="button"
                   onClick={handleDelete}
-                  className="w-full rounded-xl border border-neutral-200 px-4 py-3 text-sm font-semibold text-neutral-700 hover:border-neutral-300"
+                  className="w-full rounded-xl border border-orange-200 px-4 py-3 text-sm font-semibold text-neutral-700 hover:border-neutral-300"
                 >
                   Delete submission
                 </button>

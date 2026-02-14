@@ -14,13 +14,13 @@ export function ItemCard({
   canRemove?: boolean;
 }) {
   return (
-    <div className="rounded-xl border border-neutral-200 bg-white/70 backdrop-blur-md p-3">
+    <div className="rounded-xl border w-full overflow-x-hidden border-orange-300 bg-white/70 backdrop-blur-md p-3">
       <div className="flex gap-3 items-center">
         <input
           value={item.name}
           onChange={(e) => onChange(index, "name", e.target.value)}
           placeholder="Item name"
-          className="flex-1 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-black
+          className="flex-1 min-w-0 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-black
                      focus:outline-none focus:ring-2 focus:ring-orange-400"
         />
 
@@ -29,7 +29,7 @@ export function ItemCard({
           onChange={(e) => onChange(index, "price", e.target.value)}
           placeholder="Price"
           inputMode="numeric"
-          className="w-32 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-black
+          className="w-20 sm:w-28 md:w-32 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-black
                      focus:outline-none focus:ring-2 focus:ring-orange-400"
         />
 

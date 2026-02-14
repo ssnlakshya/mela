@@ -14,7 +14,7 @@ export function LimitedOfferCard({
   canRemove?: boolean;
 }) {
   return (
-    <div className="rounded-xl border border-neutral-200 bg-white/70 backdrop-blur-md p-3">
+    <div className="rounded-xl border border-orange-300 bg-white/70 backdrop-blur-md p-3">
       <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
         <input
           value={offer.title}

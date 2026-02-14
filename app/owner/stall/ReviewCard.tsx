@@ -14,7 +14,7 @@ export function ReviewCard({
   canRemove?: boolean;
 }) {
   return (
-    <div className="rounded-xl border border-neutral-200 bg-white/70 backdrop-blur-md p-3">
+    <div className="rounded-xl border w-full overflow-x-hidden border-orange-300 bg-white/70 backdrop-blur-md p-3">
       <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
         <input
           value={review.user}
@@ -24,14 +24,22 @@ export function ReviewCard({
                      focus:outline-none focus:ring-2 focus:ring-orange-400"
         />
 
-        <input
-          value={String(review.rating ?? "")}
-          onChange={(e) => onChange(index, "rating", e.target.value)}
-          placeholder="Rating"
-          inputMode="numeric"
-          className="md:col-span-2 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-black
-                     focus:outline-none focus:ring-2 focus:ring-orange-400"
-        />
+        <div className="md:col-span-2 flex items-center gap-1">
+            {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                key={star}
+                type="button"
+                onClick={() => onChange(index, "rating", String(star))}
+                className={`text-lg transition ${
+                    review.rating >= star
+                    ? "text-yellow-500"
+                    : "text-neutral-300"
+                } hover:scale-110`}
+                >
+                ★
+                </button>
+            ))}
+        </div>
 
         <input
           value={review.comment}
