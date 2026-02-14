@@ -18,6 +18,7 @@ export default function StallPage({ params }: PageProps) {
     const [stallData, setStallData] = useState<any | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [menuPage, setMenuPage] = useState(0);
 
     useEffect(() => {
         const loadStall = async () => {
@@ -42,6 +43,10 @@ export default function StallPage({ params }: PageProps) {
 
         void loadStall();
     }, [stallSlug]);
+
+    useEffect(() => {
+        setMenuPage(0);
+    }, [stallData?.items]);
 
     if (isLoading) {
         return (
@@ -86,6 +91,17 @@ export default function StallPage({ params }: PageProps) {
     const viewerImages = galleryImages.map(toMediaUrl);
     const displayImages = galleryImages.slice(0, 3);
     const remainingImageCount = Math.max(galleryImages.length - displayImages.length, 0);
+
+    const menuItems = Array.isArray(stallData.items) ? stallData.items : [];
+    const menuPageSize = 5;
+    const menuPageCount = Math.ceil(menuItems.length / menuPageSize);
+    const menuStart = menuPage * menuPageSize;
+    const visibleMenuItems = menuItems.slice(menuStart, menuStart + menuPageSize);
+    const hasMoreMenuItems = menuPage + 1 < menuPageCount;
+    const getMenuItemText = (item: { name?: string; price?: string } | string) => {
+        if (typeof item === "string") return { name: item, price: "" };
+        return { name: item?.name ?? "", price: item?.price ?? "" };
+    };
 
     const openViewer = (index: number) => {
         setCurrentImageIndex(index);
@@ -156,6 +172,38 @@ export default function StallPage({ params }: PageProps) {
                             {stallData.description}
                         </p>
                     </section>
+
+                    {menuItems.length > 0 && (
+                        <section className="bg-white p-6 rounded-2xl border border-neutral-200 shadow-sm">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                                <h2 className="text-3xl font-bold">Menu</h2>
+                                <span className="text-sm text-neutral-500">
+                                    Showing {Math.min(menuStart + 1, menuItems.length)}-{Math.min(menuStart + menuPageSize, menuItems.length)} of {menuItems.length}
+                                </span>
+                            </div>
+                            <div className="mt-6 space-y-3">
+                                {visibleMenuItems.map((item, idx) => {
+                                    const { name, price } = getMenuItemText(item);
+                                    if (!name && !price) return null;
+                                    return (
+                                        <div key={`${name}-${idx}`} className="flex items-center justify-between rounded-xl border border-neutral-100 bg-neutral-50 px-4 py-3">
+                                            <span className="text-base font-semibold text-neutral-800">{name || "Item"}</span>
+                                            {price && <span className="text-sm font-semibold text-neutral-600">{price}</span>}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            {menuPageCount > 1 && (
+                                <button
+                                    type="button"
+                                    onClick={() => setMenuPage((prev) => (hasMoreMenuItems ? prev + 1 : 0))}
+                                    className="mt-5 inline-flex items-center justify-center rounded-full border border-neutral-200 bg-white px-5 py-2 text-sm font-semibold text-neutral-700 shadow-sm transition hover:border-orange-300 hover:text-orange-600"
+                                >
+                                    {hasMoreMenuItems ? "Show next 5" : "Back to start"}
+                                </button>
+                            )}
+                        </section>
+                    )}
 
                     {/* Gallery */}
                     <section>

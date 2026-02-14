@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react"; // Assuming lucide-react is installed as seen in package.json
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useMemo, useState } from "react";
 
 type PageProps = {
     params: Promise<{ category: string }>;
@@ -31,9 +31,14 @@ export default function CategoryPage({ params }: PageProps) {
         bannerImage: string;
         logoImage?: string;
         ownerName: string;
+        highlights?: string[];
+        offers?: string[];
+        bestSellers?: string[];
+        items?: Array<{ name?: string; price?: string } | string>;
     }>>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [searchQuery, setSearchQuery] = useState("");
 
     useEffect(() => {
         const loadStalls = async () => {
@@ -79,6 +84,37 @@ export default function CategoryPage({ params }: PageProps) {
 
     const isRemoteUrl = (value: string) => value.startsWith("http://") || value.startsWith("https://");
 
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    const hasSearch = normalizedQuery.length > 0;
+    const filteredStalls = useMemo(() => {
+        if (!hasSearch) return stalls;
+
+        const getItemText = (item: { name?: string; price?: string } | string) => {
+            if (typeof item === "string") return item;
+            const name = item?.name ?? "";
+            const price = item?.price ?? "";
+            return `${name} ${price}`.trim();
+        };
+
+        return stalls.filter((stall) => {
+            const searchParts = [
+                stall.ownerName,
+                stall.name,
+                stall.description,
+                ...(stall.highlights ?? []),
+                ...(stall.offers ?? []),
+                ...(stall.bestSellers ?? []),
+                ...(stall.items ?? []).map(getItemText),
+            ]
+                .filter(Boolean)
+                .join(" ")
+                .toLowerCase();
+            return searchParts.includes(normalizedQuery);
+        });
+    }, [hasSearch, normalizedQuery, stalls]);
+
+    const visibleStalls = filteredStalls;
+
     return (
         <div className="min-h-screen bg-white text-neutral-900 p-8 md:p-12">
             {/* Background decoration */}
@@ -109,13 +145,29 @@ export default function CategoryPage({ params }: PageProps) {
                     </p>
                 </div>
 
+                <div className="mt-10 max-w-3xl">
+                    <label htmlFor="category-search" className="text-sm font-semibold uppercase tracking-[0.2em] text-orange-500">
+                        Search stalls
+                    </label>
+                    <div className="mt-3">
+                        <input
+                            id="category-search"
+                            value={searchQuery}
+                            onChange={(event) => setSearchQuery(event.target.value)}
+                            placeholder={`Search ${category} stalls by name, owner, or menu...`}
+                            className="w-full rounded-full border border-neutral-200 bg-white px-5 py-3 text-sm shadow-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
+                        />
+                    </div>
+                </div>
+
                 {/* Stalls Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    {stalls.map((stall, index) => {
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mt-10">
+                    {visibleStalls.map((stall, index) => {
                         const image = stall.logoImage?.trim() || stall.bannerImage?.trim() || getFallbackBanner(category);
                         const imageSrc = toMediaUrl(image);
+                        const stallKey = `${category}-${stall.slug ?? stall.name ?? "stall"}-${index}`;
                         return (
-                        <Link key={stall.slug} href={`/${category}/${(stall.slug ?? "").toLowerCase()}`}>
+                        <Link key={stallKey} href={`/${category}/${(stall.slug ?? "").toLowerCase()}`}>
                             <motion.div
                                 initial={{ opacity: 0, scale: 0.9 }}
                                 animate={{ opacity: 1, scale: 1 }}
@@ -172,6 +224,12 @@ export default function CategoryPage({ params }: PageProps) {
                 {!isLoading && !errorMessage && stalls.length === 0 && (
                     <div className="text-center py-20">
                         <h2 className="text-2xl text-neutral-400">No stalls found in this category yet.</h2>
+                    </div>
+                )}
+
+                {!isLoading && !errorMessage && hasSearch && visibleStalls.length === 0 && stalls.length > 0 && (
+                    <div className="text-center py-20">
+                        <h2 className="text-2xl text-neutral-400">No stalls match your search.</h2>
                     </div>
                 )}
             </div>
