@@ -175,6 +175,7 @@ export default function StallOwnerPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [showDetails, setShowDetails] = useState(true);
+  const MAX_GALLERY_IMAGES = 5;
   const [reviewsArr, setReviewsArr] = useState<Review[]>([
     { user: "", rating: 5, comment: "" },
   ]);
@@ -589,13 +590,30 @@ export default function StallOwnerPage() {
     const files = event.target.files ? Array.from(event.target.files) : [];
     if (files.length === 0) return;
 
-    const token = await getAccessToken();
-    if (!token) {
-      setStatusMessage("Please sign in before uploading images.");
+    const remainingSlots = MAX_GALLERY_IMAGES - galleryItems.length;
+
+    if (remainingSlots <= 0) {
+      setStatusMessage(`You can upload a maximum of ${MAX_GALLERY_IMAGES} images.`);
+      event.target.value = ""; // allow re-selecting same file later
       return;
     }
 
-    const newItems = files.map((file) => ({
+    const filesToUpload = files.slice(0, remainingSlots);
+
+    if (files.length > remainingSlots) {
+      setStatusMessage(
+        `Only ${remainingSlots} more image(s) allowed. Extra files were ignored.`
+      );
+    }
+
+    const token = await getAccessToken();
+    if (!token) {
+      setStatusMessage("Please sign in before uploading images.");
+      event.target.value = "";
+      return;
+    }
+
+    const newItems = filesToUpload.map((file) => ({
       id: createId(),
       name: file.name,
       previewUrl: URL.createObjectURL(file),
@@ -607,13 +625,15 @@ export default function StallOwnerPage() {
     await Promise.all(
       newItems.map(async (item, index) => {
         try {
-          const url = await uploadFile(files[index], "gallery", token);
+          const url = await uploadFile(filesToUpload[index], "gallery", token);
           updateGalleryItem(item.id, { uploadedUrl: url, status: "done" });
-        } catch (error) {
+        } catch {
           updateGalleryItem(item.id, { status: "error" });
         }
       })
     );
+
+    event.target.value = "";
   };
 
   const handleRemoveGalleryItem = (id: string) => {
@@ -1225,14 +1245,16 @@ export default function StallOwnerPage() {
                   <div className="mt-2 flex items-center gap-3">
                     <label
                       htmlFor="galleryUpload"
-                      className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-neutral-200 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 shadow-sm transition hover:border-orange-300 hover:text-orange-600"
+                      className={`inline-flex items-center gap-2 rounded-full border bg-white px-4 py-2 text-sm font-semibold shadow-sm transition
+                        ${galleryItems.length >= MAX_GALLERY_IMAGES
+                          ? "cursor-not-allowed border-neutral-200 text-neutral-400 opacity-60"
+                          : "cursor-pointer border-neutral-200 text-neutral-700 hover:border-orange-300 hover:text-orange-600"}
+                      `}
                     >
                       Choose files
                     </label>
                     <span className="text-xs text-neutral-500">
-                      {galleryItems.length > 0
-                        ? `${galleryItems.length} selected`
-                        : "No files selected"}
+                      {galleryItems.length}/{MAX_GALLERY_IMAGES} selected
                     </span>
                   </div>
                   <input
@@ -1241,6 +1263,7 @@ export default function StallOwnerPage() {
                     accept="image/*"
                     multiple
                     onChange={handleGalleryChange}
+                    disabled={galleryItems.length >= MAX_GALLERY_IMAGES}
                     className="sr-only"
                   />
                   {galleryItems.length > 0 && (
