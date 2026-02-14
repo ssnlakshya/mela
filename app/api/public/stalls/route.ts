@@ -18,7 +18,10 @@ export async function GET(request: NextRequest) {
   }
 
   const stalls = (data ?? [])
-    .map((row) => row.payload)
+    .map((row) => ({
+      ...row.payload,
+      slug: row.stall_slug,
+    }))
     .filter((payload) =>
       category ? payload?.category?.toLowerCase?.() === category : true
     );

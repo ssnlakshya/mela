@@ -3,10 +3,13 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+import { ItemCard } from "./ItemCard";
+import { ReviewCard } from "./ReviewCard";
+import { LimitedOfferCard } from "./LimitedOfferCard";
 
 const initialFormState = {
   name: "",
-  slug: "",
+  // slug: "",
   category: "food",
   description: "",
   ownerName: "",
@@ -155,21 +158,32 @@ export default function StallOwnerPage() {
   const router = useRouter();
   const [formValues, setFormValues] = useState(initialFormState);
   const [ownerEmail, setOwnerEmail] = useState<string | null>(null);
-  const [originalSlug, setOriginalSlug] = useState<string | null>(null);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([{ name: "", price: "" }]);
+  // const [originalSlug, setOriginalSlug] = useState<string | null>(null);
+  const [stallSlug, setStallSlug] = useState<string | null>(null)
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
   const [bannerStatus, setBannerStatus] = useState<"idle" | "uploading" | "done" | "error">("idle");
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [logoStatus, setLogoStatus] = useState<"idle" | "uploading" | "done" | "error">("idle");
-  const [slugStatus, setSlugStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
-  const [slugMessage, setSlugMessage] = useState<string | null>(null);
+  // const [slugStatus, setSlugStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
+  // const [slugMessage, setSlugMessage] = useState<string | null>(null);
   const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([]);
   const galleryItemsRef = useRef<GalleryItem[]>([]);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [showDetails, setShowDetails] = useState(true);
+  const MAX_GALLERY_IMAGES = 5;
+  const [reviewsArr, setReviewsArr] = useState<Review[]>([
+    { user: "", rating: 5, comment: "" },
+  ]);
+
+  const [limitedOffersArr, setLimitedOffersArr] = useState<LimitedOffer[]>([
+    { title: "", description: "", validTill: "" },
+  ]);
+
   const isUploading =
     bannerStatus === "uploading" ||
     logoStatus === "uploading" ||
@@ -191,6 +205,89 @@ export default function StallOwnerPage() {
     }
     return url;
   };
+
+  const handleMenuItemChange = (
+    index: number,
+    field: "name" | "price",
+    value: string
+  ) => {
+    setMenuItems((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
+  };
+
+  const addMenuItem = () => {
+    setMenuItems((prev) => [...prev, { name: "", price: "" }]);
+  };
+
+  const removeMenuItem = (index: number) => {
+    setMenuItems((prev) => (prev.length === 1 ? prev : prev.filter((_, i) => i !== index)));
+  };
+
+  const normalizeMenuItems = (items: MenuItem[]) =>
+    items
+      .map((i) => ({ name: i.name.trim(), price: i.price.trim() }))
+      .filter((i) => i.name.length > 0 && i.price.length > 0);
+
+  const handleReviewChange = (
+    index: number,
+    field: "user" | "rating" | "comment",
+    value: string
+  ) => {
+    setReviewsArr((prev) => {
+      const next = [...prev];
+      if (field === "rating") {
+        next[index] = { ...next[index], rating: Number(value) };
+      } else {
+        next[index] = { ...next[index], [field]: value } as Review;
+      }
+      return next;
+    });
+  };
+
+  const addReview = () =>
+    setReviewsArr((prev) => [...prev, { user: "", rating: 5, comment: "" }]);
+
+  const removeReview = (index: number) =>
+    setReviewsArr((prev) => (prev.length === 1 ? prev : prev.filter((_, i) => i !== index)));
+
+  const normalizeReviews = (arr: Review[]) =>
+    arr
+      .map((r) => ({
+        user: r.user.trim(),
+        rating: Number(r.rating),
+        comment: (r.comment ?? "").trim(),
+      }))
+      .filter((r) => r.user && Number.isFinite(r.rating) && r.rating >= 0 && r.rating <= 5);
+
+  const handleOfferChange = (
+    index: number,
+    field: "title" | "description" | "validTill",
+    value: string
+  ) => {
+    setLimitedOffersArr((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
+  };
+
+  const addOffer = () =>
+    setLimitedOffersArr((prev) => [...prev, { title: "", description: "", validTill: "" }]);
+
+  const removeOffer = (index: number) =>
+    setLimitedOffersArr((prev) => (prev.length === 1 ? prev : prev.filter((_, i) => i !== index)));
+
+  const normalizeOffers = (arr: LimitedOffer[]) =>
+    arr
+      .map((o) => ({
+        title: o.title.trim(),
+        description: o.description?.trim() || undefined,
+        validTill: o.validTill?.trim() || undefined,
+      }))
+      .filter((o) => o.title.length > 0);
 
   useEffect(() => {
     const loadSession = async () => {
@@ -215,7 +312,7 @@ export default function StallOwnerPage() {
         if (response.status === 403) {
           // Email not in allowlist
           await supabase.auth.signOut();
-          setStatusMessage("for that you have to put stall next year bye bye 👋");
+          setStatusMessage("For that you have to put a stall. See you next year bye bye 👋");
           setOwnerEmail(null);
           setIsLoading(false);
           return;
@@ -223,6 +320,7 @@ export default function StallOwnerPage() {
 
         if (response.ok) {
           const result = await response.json();
+          setStallSlug(result.submission?.stall_slug ?? null);
           const payload = result.submission?.payload as StallPayload | undefined;
 
           if (payload) {
@@ -251,16 +349,16 @@ export default function StallOwnerPage() {
             setFormValues({
               ...initialFormState,
               name: payload.name ?? "",
-              slug: payload.slug ?? "",
+              // slug: payload.slug ?? "",
               category: payload.category ?? "food",
               description: payload.description ?? "",
               ownerName: payload.ownerName ?? "",
               ownerPhone: payload.ownerPhone ?? "",
               instagram: payload.instagram ?? "",
               stallNumber: payload.stallNumber ?? "",
-              items: itemsValue
-                .map((item) => `${item.name} - ${item.price}`)
-                .join("\n"),
+              // items: itemsValue
+              //   .map((item) => `${item.name} - ${item.price}`)
+              //   .join("\n"),
               highlights: highlightsValue.join(", "),
               bestSellers: bestSellersValue.join(", "),
               offers: offersValue.join(", "),
@@ -282,9 +380,19 @@ export default function StallOwnerPage() {
               paymentMethods: paymentMethodsValue.join(", "),
             });
 
-            if (payload.slug) {
-              setOriginalSlug(payload.slug.trim().toLowerCase());
-            }
+            setMenuItems(itemsValue.length ? itemsValue : [{ name: "", price: "" }]);
+
+            setReviewsArr(
+              reviewsValue.length ? reviewsValue : [{ user: "", rating: 5, comment: "" }]
+            );
+
+            setLimitedOffersArr(
+              limitedTimeOffersValue.length ? limitedTimeOffersValue : [{ title: "", description: "", validTill: "" }]
+            );
+
+            // if (payload.slug) {
+            //   setOriginalSlug(payload.slug.trim().toLowerCase());
+            // }
 
             if (payload.bannerImage) setBannerUrl(payload.bannerImage);
             if (payload.logoImage) setLogoUrl(payload.logoImage);
@@ -335,50 +443,50 @@ export default function StallOwnerPage() {
     };
   }, []);
 
-  useEffect(() => {
-    const nextSlug = formValues.slug.trim().toLowerCase();
-    if (!nextSlug) {
-      setSlugStatus("idle");
-      setSlugMessage(null);
-      return;
-    }
+  // useEffect(() => {
+  //   const nextSlug = formValues.slug.trim().toLowerCase();
+  //   if (!nextSlug) {
+  //     setSlugStatus("idle");
+  //     setSlugMessage(null);
+  //     return;
+  //   }
 
-    if (originalSlug && nextSlug === originalSlug) {
-      setSlugStatus("available");
-      setSlugMessage(null);
-      return;
-    }
+  //   if (originalSlug && nextSlug === originalSlug) {
+  //     setSlugStatus("available");
+  //     setSlugMessage(null);
+  //     return;
+  //   }
 
-    setSlugStatus("checking");
-    setSlugMessage(null);
-    let isActive = true;
-    const timer = setTimeout(async () => {
-      try {
-        const response = await fetch(`/api/public/stalls/${encodeURIComponent(nextSlug)}`);
-        if (!response.ok) {
-          throw new Error("Failed to validate slug");
-        }
-        const data = await response.json();
-        if (!isActive) return;
-        if (data?.stall) {
-          setSlugStatus("taken");
-          setSlugMessage("Short link already taken.");
-        } else {
-          setSlugStatus("available");
-          setSlugMessage(null);
-        }
-      } catch {
-        if (!isActive) return;
-        setSlugStatus("idle");
-        setSlugMessage(null);
-      }
-    }, 400);
+  //   setSlugStatus("checking");
+  //   setSlugMessage(null);
+  //   let isActive = true;
+  //   const timer = setTimeout(async () => {
+  //     try {
+  //       const response = await fetch(`/api/public/stalls/${encodeURIComponent(nextSlug)}`);
+  //       if (!response.ok) {
+  //         throw new Error("Failed to validate slug");
+  //       }
+  //       const data = await response.json();
+  //       if (!isActive) return;
+  //       if (data?.stall) {
+  //         setSlugStatus("taken");
+  //         setSlugMessage("Short link already taken.");
+  //       } else {
+  //         setSlugStatus("available");
+  //         setSlugMessage(null);
+  //       }
+  //     } catch {
+  //       if (!isActive) return;
+  //       setSlugStatus("idle");
+  //       setSlugMessage(null);
+  //     }
+  //   }, 400);
 
-    return () => {
-      isActive = false;
-      clearTimeout(timer);
-    };
-  }, [formValues.slug, originalSlug]);
+  //   return () => {
+  //     isActive = false;
+  //     clearTimeout(timer);
+  //   };
+  // }, [formValues.slug, originalSlug]);
 
   const getAccessToken = async () => {
     const supabase = createBrowserSupabaseClient();
@@ -483,13 +591,30 @@ export default function StallOwnerPage() {
     const files = event.target.files ? Array.from(event.target.files) : [];
     if (files.length === 0) return;
 
-    const token = await getAccessToken();
-    if (!token) {
-      setStatusMessage("Please sign in before uploading images.");
+    const remainingSlots = MAX_GALLERY_IMAGES - galleryItems.length;
+
+    if (remainingSlots <= 0) {
+      setStatusMessage(`You can upload a maximum of ${MAX_GALLERY_IMAGES} images.`);
+      event.target.value = ""; // allow re-selecting same file later
       return;
     }
 
-    const newItems = files.map((file) => ({
+    const filesToUpload = files.slice(0, remainingSlots);
+
+    if (files.length > remainingSlots) {
+      setStatusMessage(
+        `Only ${remainingSlots} more image(s) allowed. Extra files were ignored.`
+      );
+    }
+
+    const token = await getAccessToken();
+    if (!token) {
+      setStatusMessage("Please sign in before uploading images.");
+      event.target.value = "";
+      return;
+    }
+
+    const newItems = filesToUpload.map((file) => ({
       id: createId(),
       name: file.name,
       previewUrl: URL.createObjectURL(file),
@@ -501,13 +626,15 @@ export default function StallOwnerPage() {
     await Promise.all(
       newItems.map(async (item, index) => {
         try {
-          const url = await uploadFile(files[index], "gallery", token);
+          const url = await uploadFile(filesToUpload[index], "gallery", token);
           updateGalleryItem(item.id, { uploadedUrl: url, status: "done" });
-        } catch (error) {
+        } catch {
           updateGalleryItem(item.id, { status: "error" });
         }
       })
     );
+
+    event.target.value = "";
   };
 
   const handleRemoveGalleryItem = (id: string) => {
@@ -524,11 +651,11 @@ export default function StallOwnerPage() {
     setIsSubmitting(true);
 
     try {
-      if (slugStatus === "taken") {
-        setStatusMessage("Short link already taken. Choose another.");
-        setIsSubmitting(false);
-        return;
-      }
+      // if (slugStatus === "taken") {
+      //   setStatusMessage("Short link already taken. Choose another.");
+      //   setIsSubmitting(false);
+      //   return;
+      // }
 
       if (!bannerUrl) {
         setStatusMessage("Please upload a banner image before saving.");
@@ -545,7 +672,7 @@ export default function StallOwnerPage() {
 
       const payload = {
         name: formValues.name.trim(),
-        slug: formValues.slug.trim(),
+        // slug: formValues.slug.trim(),
         category: formValues.category,
         description: formValues.description.trim(),
         bannerImage: bannerUrl ?? "",
@@ -556,15 +683,15 @@ export default function StallOwnerPage() {
         ownerName: formValues.ownerName.trim(),
         ownerPhone: formValues.ownerPhone.trim(),
         instagram: formValues.instagram.trim() || undefined,
-        items: parseItems(formValues.items),
+        items: normalizeMenuItems(menuItems),
         highlights: parseCsv(formValues.highlights),
         bestSellers: parseCsv(formValues.bestSellers),
         offers: parseCsv(formValues.offers),
         availableAt: parseCsv(formValues.availableAt),
         stallNumber: formValues.stallNumber.trim() || undefined,
         paymentMethods: parseCsv(formValues.paymentMethods),
-        limitedTimeOffers: parseLimitedOffers(formValues.limitedTimeOffers),
-        reviews: parseReviews(formValues.reviews),
+        reviews: normalizeReviews(reviewsArr),
+        limitedTimeOffers: normalizeOffers(limitedOffersArr),
       };
 
       const response = await fetch("/api/stalls", {
@@ -578,16 +705,14 @@ export default function StallOwnerPage() {
 
       if (!response.ok) {
         const errorBody = await response.json().catch(() => null);
-        if (response.status === 409) {
-          setStatusMessage("Short link already taken. Choose another.");
-        } else {
-          setStatusMessage(errorBody?.error || "Failed to save details.");
-        }
+        setStatusMessage(errorBody?.error || "Failed to save details.");
         return;
       }
 
+      const result = await response.json();
+      setStallSlug(result?.submission?.stall_slug ?? null);
       setStatusMessage("Saved! You can update this anytime.");
-    } catch (error) {
+    } catch (error) { 
       setStatusMessage(
         error instanceof Error ? error.message : "Failed to save details."
       );
@@ -622,6 +747,7 @@ export default function StallOwnerPage() {
 
       setStatusMessage("Submission deleted.");
       setFormValues(initialFormState);
+      setMenuItems([{ name: "", price: "" }]);
       setBannerUrl(null);
       setLogoUrl(null);
       setGalleryItems([]);
@@ -679,7 +805,7 @@ export default function StallOwnerPage() {
           <button
             type="button"
             onClick={() => setShowDetails((prev) => !prev)}
-            className="flex items-center gap-4 rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm transition hover:border-orange-200"
+            className="flex items-center gap-4 rounded-2xl border border-neutral-100 bg-white p-4 shadow-md shadow-orange-400/50 transition hover:border-orange-200"
           >
             <div className="h-14 w-14 overflow-hidden rounded-2xl border border-neutral-200 bg-neutral-50">
               {logoPreview || logoUrl ? (
@@ -709,17 +835,44 @@ export default function StallOwnerPage() {
           </button>
         </div>
 
+        {stallSlug && (
+          <div className="mt-4">
+            <label className="text-sm font-medium text-orange-700">Your short link</label>
+            <div className="mt-2 flex items-center gap-2">
+              <input
+                value={`${process.env.NEXT_PUBLIC_SHORT_DOMAIN}/${stallSlug}`}
+                readOnly
+                className="w-full rounded-xl border border-orange-400 px-4 py-3 text-sm bg-neutral-50 text-neutral-900"
+              />
+              <button
+                type="button"
+                onClick={() =>
+                  navigator.clipboard.writeText(
+                    `${process.env.NEXT_PUBLIC_SHORT_DOMAIN}/${stallSlug}`
+                  )
+                }
+                className="shrink-0 rounded-xl border border-orange-300 bg-orange-600 px-4 py-3 text-sm font-semibold text-white hover:border-orange-400 hover:bg-orange-100"
+              >
+                Copy
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-neutral-500">
+              This link is generated automatically from your stall name. The first time you save, it will be set and cannot be changed. Make sure you're happy with it!
+            </p>
+          </div>
+        )}
+
         {showDetails && (
           <form
             className="grid grid-cols-1 gap-8 lg:grid-cols-3"
             onSubmit={handleSubmit}
           >
             <section className="lg:col-span-2 space-y-6">
-            <div className="rounded-2xl border border-neutral-100 bg-white p-6 shadow-sm">
+            <div className="rounded-2xl border border-neutral-100 bg-white p-6 shadow-md shadow-orange-400/50">
               <h2 className="text-xl font-semibold text-neutral-900">Stall info</h2>
               <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
-                  <label className="text-sm font-medium text-neutral-700" htmlFor="name">
+                  <label className="text-sm font-medium text-orange-700" htmlFor="name">
                     Stall name *
                   </label>
                   <input
@@ -728,11 +881,11 @@ export default function StallOwnerPage() {
                     value={formValues.name}
                     onChange={handleInputChange}
                     placeholder="Spicy Bites"
-                    className="mt-2 w-full rounded-xl border border-neutral-200 px-4 py-3 text-sm shadow-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
+                    className="mt-2 w-full rounded-xl border border-neutral-200 px-4 py-3 text-sm shadow-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100 text-neutral-900"
                   />
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-neutral-700" htmlFor="slug">
+                {/* <div>
+                  <label className="text-sm font-medium text-orange-700" htmlFor="slug">
                     Short link *
                   </label>
                   <input
@@ -741,7 +894,7 @@ export default function StallOwnerPage() {
                     value={formValues.slug}
                     onChange={handleInputChange}
                     placeholder="spicy-bites"
-                    className="mt-2 w-full rounded-xl border border-neutral-200 px-4 py-3 text-sm shadow-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
+                    className="mt-2 w-full rounded-xl border border-neutral-200 px-4 py-3 text-sm shadow-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100 text-neutral-900"
                   />
                   <small className="mt-2 block text-xs text-neutral-500">
                     This becomes the web address for your stall (letters, numbers, and dashes only).
@@ -757,9 +910,9 @@ export default function StallOwnerPage() {
                       ? "Checking availability..."
                       : slugMessage ?? "Keep it short and unique."}
                   </p>
-                </div>
+                </div> */}
                 <div>
-                  <label className="text-sm font-medium text-neutral-700" htmlFor="category">
+                  <label className="text-sm font-medium text-orange-700" htmlFor="category">
                     Category *
                   </label>
                   <select
@@ -767,7 +920,7 @@ export default function StallOwnerPage() {
                     name="category"
                     value={formValues.category}
                     onChange={handleInputChange}
-                    className="mt-2 w-full rounded-xl border border-neutral-200 px-4 py-3 text-sm shadow-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
+                    className="mt-2 w-full rounded-xl text-neutral-900 border border-neutral-200 px-4 py-3 text-sm shadow-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
                   >
                     <option value="food">Food</option>
                     <option value="accessories">Accessories</option>
@@ -775,7 +928,7 @@ export default function StallOwnerPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-neutral-700" htmlFor="stallNumber">
+                  <label className="text-sm font-medium text-orange-700" htmlFor="stallNumber">
                     Stall number
                   </label>
                   <input
@@ -784,13 +937,13 @@ export default function StallOwnerPage() {
                     value={formValues.stallNumber}
                     onChange={handleInputChange}
                     placeholder="F-04"
-                    className="mt-2 w-full rounded-xl border border-neutral-200 px-4 py-3 text-sm shadow-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
+                    className="mt-2 w-full rounded-xl text-neutral-900 border border-neutral-200 px-4 py-3 text-sm shadow-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
                   />
                 </div>
               </div>
               <div className="mt-4">
                 <label
-                  className="text-sm font-medium text-neutral-700"
+                  className="text-sm font-medium text-orange-700"
                   htmlFor="description"
                 >
                   Description *
@@ -802,16 +955,16 @@ export default function StallOwnerPage() {
                   onChange={handleInputChange}
                   rows={3}
                   placeholder="Tell visitors what makes your stall special."
-                  className="mt-2 w-full rounded-xl border border-neutral-200 px-4 py-3 text-sm shadow-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
+                  className="mt-2 w-full rounded-xl text-neutral-900 border border-neutral-200 px-4 py-3 text-sm shadow-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
                 />
               </div>
             </div>
 
-            <div className="rounded-2xl border border-neutral-100 bg-white p-6 shadow-sm">
+            <div className="rounded-2xl border border-neutral-100 bg-white p-6 shadow-md shadow-orange-400/50">
               <h2 className="text-xl font-semibold text-neutral-900">Owner details</h2>
               <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
-                  <label className="text-sm font-medium text-neutral-700" htmlFor="ownerName">
+                  <label className="text-sm font-medium text-orange-700" htmlFor="ownerName">
                     Owner name *
                   </label>
                   <input
@@ -820,11 +973,11 @@ export default function StallOwnerPage() {
                     value={formValues.ownerName}
                     onChange={handleInputChange}
                     placeholder="Rajesh Kumar"
-                    className="mt-2 w-full rounded-xl border border-neutral-200 px-4 py-3 text-sm shadow-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
+                    className="mt-2 w-full rounded-xl text-neutral-900 border border-neutral-200 px-4 py-3 text-sm shadow-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-neutral-700" htmlFor="ownerPhone">
+                  <label className="text-sm font-medium text-orange-700" htmlFor="ownerPhone">
                     Owner phone *
                   </label>
                   <input
@@ -833,11 +986,11 @@ export default function StallOwnerPage() {
                     value={formValues.ownerPhone}
                     onChange={handleInputChange}
                     placeholder="+91 98765 43210"
-                    className="mt-2 w-full rounded-xl border border-neutral-200 px-4 py-3 text-sm shadow-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
+                    className="mt-2 w-full rounded-xl text-neutral-900 border border-neutral-200 px-4 py-3 text-sm shadow-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-neutral-700" htmlFor="instagram">
+                  <label className="text-sm font-medium text-orange-700" htmlFor="instagram">
                     Instagram
                   </label>
                   <input
@@ -846,11 +999,11 @@ export default function StallOwnerPage() {
                     value={formValues.instagram}
                     onChange={handleInputChange}
                     placeholder="@spicybites_official"
-                    className="mt-2 w-full rounded-xl border border-neutral-200 px-4 py-3 text-sm shadow-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
+                    className="mt-2 w-full rounded-xl text-neutral-900 border border-neutral-200 px-4 py-3 text-sm shadow-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-neutral-700" htmlFor="paymentMethods">
+                  <label className="text-sm font-medium text-orange-700" htmlFor="paymentMethods">
                     Payment methods (modes only)
                   </label>
                   <input
@@ -859,32 +1012,51 @@ export default function StallOwnerPage() {
                     value={formValues.paymentMethods}
                     onChange={handleInputChange}
                     placeholder="UPI, Cash, GPay"
-                    className="mt-2 w-full rounded-xl border border-neutral-200 px-4 py-3 text-sm shadow-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
+                    className="mt-2 w-full rounded-xl text-neutral-900 border border-neutral-200 px-4 py-3 text-sm shadow-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
                   />
                 </div>
               </div>
             </div>
 
-            <div className="rounded-2xl border border-neutral-100 bg-white p-6 shadow-sm">
+            <div className="rounded-2xl border border-neutral-100 bg-white p-6 shadow-md shadow-orange-400/50">
               <h2 className="text-xl font-semibold text-neutral-900">Menu and extras</h2>
               <div className="mt-4 space-y-4">
                 <div>
-                  <label className="text-sm font-medium text-neutral-700" htmlFor="items">
-                    Items (name - price, one per line)
-                  </label>
-                  <textarea
-                    id="items"
-                    name="items"
-                    value={formValues.items}
-                    onChange={handleInputChange}
-                    rows={3}
-                    placeholder="Pani Puri - 50"
-                    className="mt-2 w-full rounded-xl border border-neutral-200 px-4 py-3 text-sm shadow-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
-                  />
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium text-orange-700">
+                      Items
+                    </label>
+
+                    <button
+                      type="button"
+                      onClick={addMenuItem}
+                      className="rounded-full border border-orange-300 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 shadow-sm transition hover:border-orange-300 hover:text-orange-600"
+                    >
+                      + Add item
+                    </button>
+                  </div>
+
+                  <div className="mt-3 space-y-3">
+                    {menuItems.map((item, index) => (
+                      <ItemCard
+                        key={index}
+                        item={item}
+                        index={index}
+                        onChange={handleMenuItemChange}
+                        onRemove={removeMenuItem}
+                        canRemove={menuItems.length > 1}
+                      />
+                    ))}
+                  </div>
+
+                  <p className="mt-2 text-xs text-neutral-500">
+                    Add one item per row. No formatting needed.
+                  </p>
                 </div>
+
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
-                    <label className="text-sm font-medium text-neutral-700" htmlFor="highlights">
+                    <label className="text-sm font-medium text-orange-700" htmlFor="highlights">
                       Highlights
                     </label>
                     <textarea
@@ -894,11 +1066,11 @@ export default function StallOwnerPage() {
                       onChange={handleInputChange}
                       rows={2}
                       placeholder="Comma-separated highlights"
-                      className="mt-2 w-full rounded-xl border border-neutral-200 px-4 py-3 text-sm shadow-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
+                      className="mt-2 w-full text-neutral-900 rounded-xl border border-neutral-200 px-4 py-3 text-sm shadow-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
                     />
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-neutral-700" htmlFor="bestSellers">
+                    <label className="text-sm font-medium text-orange-700" htmlFor="bestSellers">
                       Best sellers
                     </label>
                     <textarea
@@ -908,13 +1080,13 @@ export default function StallOwnerPage() {
                       onChange={handleInputChange}
                       rows={2}
                       placeholder="Comma-separated items"
-                      className="mt-2 w-full rounded-xl border border-neutral-200 px-4 py-3 text-sm shadow-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
+                      className="mt-2 w-full text-neutral-900 rounded-xl border border-neutral-200 px-4 py-3 text-sm shadow-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
                     />
                   </div>
                 </div>
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
-                    <label className="text-sm font-medium text-neutral-700" htmlFor="offers">
+                    <label className="text-sm font-medium text-orange-700" htmlFor="offers">
                       Offers
                     </label>
                     <textarea
@@ -924,11 +1096,11 @@ export default function StallOwnerPage() {
                       onChange={handleInputChange}
                       rows={2}
                       placeholder="Comma-separated offers"
-                      className="mt-2 w-full rounded-xl border border-neutral-200 px-4 py-3 text-sm shadow-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
+                      className="mt-2 w-full text-neutral-900 rounded-xl border border-neutral-200 px-4 py-3 text-sm shadow-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
                     />
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-neutral-700" htmlFor="availableAt">
+                    <label className="text-sm font-medium text-orange-700" htmlFor="availableAt">
                       Available at
                     </label>
                     <textarea
@@ -938,44 +1110,68 @@ export default function StallOwnerPage() {
                       onChange={handleInputChange}
                       rows={2}
                       placeholder="Events or locations"
-                      className="mt-2 w-full rounded-xl border border-neutral-200 px-4 py-3 text-sm shadow-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
+                      className="mt-2 w-full text-neutral-900 rounded-xl border border-neutral-200 px-4 py-3 text-sm shadow-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-neutral-700" htmlFor="reviews">
-                    Reviews (user - rating - comment)
-                  </label>
-                  <textarea
-                    id="reviews"
-                    name="reviews"
-                    value={formValues.reviews}
-                    onChange={handleInputChange}
-                    rows={3}
-                    placeholder="Aditi S. - 5 - Best pani puri"
-                    className="mt-2 w-full rounded-xl border border-neutral-200 px-4 py-3 text-sm shadow-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
-                  />
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium text-orange-700">Reviews</label>
+
+                    <button
+                      type="button"
+                      onClick={addReview}
+                      className="rounded-full border border-orange-300 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 shadow-sm transition hover:border-orange-400 hover:text-orange-700"
+                    >
+                      + Add review
+                    </button>
+                  </div>
+
+                  <div className="mt-3 space-y-3">
+                    {reviewsArr.map((review, index) => (
+                      <ReviewCard
+                        key={index}
+                        review={review}
+                        index={index}
+                        onChange={handleReviewChange}
+                        onRemove={removeReview}
+                        canRemove={reviewsArr.length > 1}
+                      />
+                    ))}
+                  </div>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-neutral-700" htmlFor="limitedTimeOffers">
-                    Limited time offers (title - description - valid till)
-                  </label>
-                  <textarea
-                    id="limitedTimeOffers"
-                    name="limitedTimeOffers"
-                    value={formValues.limitedTimeOffers}
-                    onChange={handleInputChange}
-                    rows={3}
-                    placeholder="Weekend Combo - Discounted snack box - 2026-03-01"
-                    className="mt-2 w-full rounded-xl border border-neutral-200 px-4 py-3 text-sm shadow-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
-                  />
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium text-orange-700">Limited time offers</label>
+
+                    <button
+                      type="button"
+                      onClick={addOffer}
+                      className="rounded-full border border-orange-300 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 shadow-sm transition hover:border-orange-300 hover:text-orange-600"
+                    >
+                      + Add offer
+                    </button>
+                  </div>
+
+                  <div className="mt-3 space-y-3">
+                    {limitedOffersArr.map((offer, index) => (
+                      <LimitedOfferCard
+                        key={index}
+                        offer={offer}
+                        index={index}
+                        onChange={handleOfferChange}
+                        onRemove={removeOffer}
+                        canRemove={limitedOffersArr.length > 1}
+                      />
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
           </section>
 
           <aside className="space-y-6">
-            <div className="rounded-2xl border border-neutral-100 bg-white p-6 shadow-sm">
+            <div className="rounded-2xl border border-neutral-100 bg-white p-6 shadow-md shadow-orange-400/50">
               <h2 className="text-xl font-semibold text-neutral-900">Images</h2>
               <div className="mt-4 space-y-4">
                 <div>
@@ -1075,14 +1271,16 @@ export default function StallOwnerPage() {
                   <div className="mt-2 flex items-center gap-3">
                     <label
                       htmlFor="galleryUpload"
-                      className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-neutral-200 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 shadow-sm transition hover:border-orange-300 hover:text-orange-600"
+                      className={`inline-flex items-center gap-2 rounded-full border bg-white px-4 py-2 text-sm font-semibold shadow-sm transition
+                        ${galleryItems.length >= MAX_GALLERY_IMAGES
+                          ? "cursor-not-allowed border-neutral-200 text-neutral-400 opacity-60"
+                          : "cursor-pointer border-neutral-200 text-neutral-700 hover:border-orange-300 hover:text-orange-600"}
+                      `}
                     >
                       Choose files
                     </label>
                     <span className="text-xs text-neutral-500">
-                      {galleryItems.length > 0
-                        ? `${galleryItems.length} selected`
-                        : "No files selected"}
+                      {galleryItems.length}/{MAX_GALLERY_IMAGES} selected
                     </span>
                   </div>
                   <input
@@ -1091,6 +1289,7 @@ export default function StallOwnerPage() {
                     accept="image/*"
                     multiple
                     onChange={handleGalleryChange}
+                    disabled={galleryItems.length >= MAX_GALLERY_IMAGES}
                     className="sr-only"
                   />
                   {galleryItems.length > 0 && (
@@ -1129,12 +1328,13 @@ export default function StallOwnerPage() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-neutral-100 bg-white p-6 shadow-sm">
+            <div className="rounded-2xl border border-neutral-100 bg-white p-6 shadow-md shadow-orange-400/50">
               <h2 className="text-xl font-semibold text-neutral-900">Actions</h2>
               <div className="mt-4 space-y-3">
                 <button
                   type="submit"
-                  disabled={isSubmitting || isUploading || slugStatus === "taken" || slugStatus === "checking"}
+                  // disabled={isSubmitting || isUploading || slugStatus === "taken" || slugStatus === "checking"}
+                  disabled={isSubmitting || isUploading}
                   className="w-full rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(255,140,0,0.3)] transition-transform hover:scale-[1.01] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-70"
                 >
                   {isSubmitting ? "Saving..." : "Save stall details"}
@@ -1142,7 +1342,7 @@ export default function StallOwnerPage() {
                 <button
                   type="button"
                   onClick={handleDelete}
-                  className="w-full rounded-xl border border-neutral-200 px-4 py-3 text-sm font-semibold text-neutral-700 hover:border-neutral-300"
+                  className="w-full rounded-xl border border-orange-200 px-4 py-3 text-sm font-semibold text-neutral-700 hover:border-neutral-300"
                 >
                   Delete submission
                 </button>

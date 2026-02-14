@@ -24,7 +24,7 @@ export async function GET(
 
     const { data, error } = await supabase
       .from("stall_submissions")
-      .select("payload")
+      .select("stall_slug,payload")
       .eq("stall_slug", slug)
       .order("created_at", { ascending: false })
       .limit(1)
