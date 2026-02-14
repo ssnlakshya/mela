@@ -1,6 +1,7 @@
-import { ssnlat } from "./client";
+import { getSsnlatClient } from "./client";
 
 export async function upsertShortUrl(shortCode: string, longUrl: string) {
+  const ssnlat = getSsnlatClient();
   // Prefer update-first to avoid requiring a unique constraint for upsert.
   // If update affects 0 rows, insert.
   const { data: updated, error: updErr } = await ssnlat

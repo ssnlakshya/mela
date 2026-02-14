@@ -47,7 +47,7 @@ serve(async (req: Request): Promise<Response> => {
     if (!ownerResult.data && !clubResult.data) {
       return new Response(
         JSON.stringify({
-          error: "for that you have to put stall next year bye bye 👋",
+          error: "for that you have put stall next year",
         }),
         { status: 403, headers: { "Content-Type": "application/json" } }
       );

@@ -71,8 +71,12 @@ export default function StallPage({ params }: PageProps) {
     const heroImage = stallData.bannerImage?.trim()
         ? stallData.bannerImage
         : "/images/food.png";
+    const isNonEmptyString = (value: unknown): value is string =>
+        typeof value === "string" && value.trim().length > 0;
+    const toStringList = (value: unknown): string[] =>
+        Array.isArray(value) ? value.filter(isNonEmptyString) : [];
     const galleryImages = Array.isArray(stallData.images) && stallData.images.length > 0
-        ? stallData.images.filter(Boolean)
+        ? stallData.images.filter(isNonEmptyString)
         : heroImage
             ? [heroImage]
             : [];
@@ -89,19 +93,32 @@ export default function StallPage({ params }: PageProps) {
     const isRemoteUrl = (value: string) => value.startsWith("http://") || value.startsWith("https://");
     const heroSrc = toMediaUrl(heroImage);
     const viewerImages = galleryImages.map(toMediaUrl);
-    const displayImages = galleryImages.slice(0, 3);
+    const displayImages: string[] = galleryImages.slice(0, 3);
     const remainingImageCount = Math.max(galleryImages.length - displayImages.length, 0);
 
-    const menuItems = Array.isArray(stallData.items) ? stallData.items : [];
+    type MenuItem = { name?: string; price?: string };
+    type Review = { user?: string; rating?: number; comment?: string };
+    const menuItems = Array.isArray(stallData.items)
+        ? (stallData.items as Array<MenuItem | string>)
+        : [];
     const menuPageSize = 5;
     const menuPageCount = Math.ceil(menuItems.length / menuPageSize);
     const menuStart = menuPage * menuPageSize;
     const visibleMenuItems = menuItems.slice(menuStart, menuStart + menuPageSize);
     const hasMoreMenuItems = menuPage + 1 < menuPageCount;
-    const getMenuItemText = (item: { name?: string; price?: string } | string) => {
+    const getMenuItemText = (item: MenuItem | string) => {
         if (typeof item === "string") return { name: item, price: "" };
         return { name: item?.name ?? "", price: item?.price ?? "" };
     };
+
+    const availableAtList = toStringList(stallData.availableAt);
+    const offersList = toStringList(stallData.offers);
+    const paymentMethodsList = toStringList(stallData.paymentMethods);
+    const highlightsList = toStringList(stallData.highlights);
+    const bestSellersList = toStringList(stallData.bestSellers);
+    const reviewsList = Array.isArray(stallData.reviews)
+        ? (stallData.reviews as Review[]).filter((review): review is Review => Boolean(review))
+        : [];
 
     const openViewer = (index: number) => {
         setCurrentImageIndex(index);
@@ -182,7 +199,7 @@ export default function StallPage({ params }: PageProps) {
                                 </span>
                             </div>
                             <div className="mt-6 space-y-3">
-                                {visibleMenuItems.map((item, idx) => {
+                                {visibleMenuItems.map((item: MenuItem | string, idx: number) => {
                                     const { name, price } = getMenuItemText(item);
                                     if (!name && !price) return null;
                                     return (
@@ -256,11 +273,11 @@ export default function StallPage({ params }: PageProps) {
                             Location
                         </h3>
                         <div className="space-y-4">
-                            {stallData.availableAt && (
+                            {availableAtList.length > 0 && (
                                 <div>
                                     <p className="text-xs font-bold text-neutral-400 uppercase mb-1">Available At</p>
                                     <ul className="space-y-1">
-                                        {stallData.availableAt.map((loc, idx) => (
+                                        {availableAtList.map((loc, idx) => (
                                             <li key={idx} className="text-neutral-700 font-medium flex items-center gap-2">
                                                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
                                                 {loc}
@@ -279,14 +296,14 @@ export default function StallPage({ params }: PageProps) {
                     </div>
 
                     {/* Offers Card */}
-                    {stallData.offers && (
+                    {offersList.length > 0 && (
                         <div className="bg-gradient-to-br from-pink-50 to-rose-50 p-6 rounded-2xl border border-pink-100 shadow-sm">
                             <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-rose-600">
                                 <Gift className="w-5 h-5" />
                                 Current Offers
                             </h3>
                             <ul className="space-y-3">
-                                {stallData.offers.map((offer, idx) => (
+                                {offersList.map((offer, idx) => (
                                     <li key={idx} className="flex items-start gap-3 text-neutral-800 font-medium">
                                         <span className="text-xl">🎉</span>
                                         <span>{offer}</span>
@@ -327,11 +344,11 @@ export default function StallPage({ params }: PageProps) {
 
                         {/* Payment & Ordering Info */}
                         <div className="bg-white p-4 rounded-xl border border-neutral-200 space-y-3">
-                            {stallData.paymentMethods && (
+                            {paymentMethodsList.length > 0 && (
                                 <div>
                                     <p className="text-xs font-bold text-neutral-400 uppercase mb-2">Payment</p>
                                     <div className="flex gap-2">
-                                        {stallData.paymentMethods.map((pm, i) => (
+                                        {paymentMethodsList.map((pm, i) => (
                                             <span key={i} className="px-2 py-1 bg-neutral-100 text-neutral-600 text-xs font-bold rounded flex items-center gap-1">
                                                 {pm === 'UPI' && <QrCode className="w-3 h-3" />}
                                                 {pm}
@@ -348,14 +365,14 @@ export default function StallPage({ params }: PageProps) {
                     </div>
 
                     {/* Stall Highlights */}
-                    {stallData.highlights && (
+                    {highlightsList.length > 0 && (
                         <div className="bg-white p-6 rounded-2xl border border-neutral-200 shadow-sm">
                             <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-orange-600">
                                 <Sparkles className="w-5 h-5" />
                                 Why Buy From Us?
                             </h3>
                             <ul className="space-y-3">
-                                {stallData.highlights.map((highlight, idx) => (
+                                {highlightsList.map((highlight, idx) => (
                                     <li key={idx} className="flex items-start gap-3 text-neutral-700">
                                         <div className="mt-1 min-w-[6px] min-h-[6px] rounded-full bg-orange-500" />
                                         <span>{highlight}</span>
@@ -366,14 +383,14 @@ export default function StallPage({ params }: PageProps) {
                     )}
 
                     {/* Best Sellers */}
-                    {stallData.bestSellers && (
+                    {bestSellersList.length > 0 && (
                         <div className="bg-gradient-to-br from-orange-50 to-red-50 p-6 rounded-2xl border border-orange-100 shadow-sm">
                             <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-red-600">
                                 <Trophy className="w-5 h-5" />
                                 Best Sellers
                             </h3>
                             <div className="flex flex-wrap gap-2">
-                                {stallData.bestSellers.map((item, idx) => (
+                                {bestSellersList.map((item, idx) => (
                                     <span key={idx} className="bg-white text-neutral-800 px-3 py-1 rounded-full text-sm font-medium shadow-sm border border-orange-100">
                                         {item}
                                     </span>
@@ -383,24 +400,29 @@ export default function StallPage({ params }: PageProps) {
                     )}
 
                     {/* Reviews */}
-                    {stallData.reviews && (
+                    {reviewsList.length > 0 && (
                         <div className="bg-white p-6 rounded-2xl border border-neutral-200 shadow-sm">
                             <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
                                 <MessageCircle className="w-5 h-5 text-blue-500" />
                                 Customer Love
                             </h3>
                             <div className="space-y-4">
-                                {stallData.reviews.map((review, idx) => (
+                                {reviewsList.map((review, idx) => {
+                                    const rating = Math.max(0, Math.min(5, Number(review.rating ?? 0)));
+                                    const comment = review.comment ?? "";
+                                    const user = review.user ?? "Anonymous";
+                                    return (
                                     <div key={idx} className="border-b border-dashed border-neutral-100 last:border-0 pb-3 last:pb-0">
                                         <div className="flex items-center gap-1 text-yellow-500 mb-1">
                                             {[...Array(5)].map((_, i) => (
-                                                <Star key={i} className={`w-3 h-3 ${i < review.rating ? "fill-current" : "text-neutral-300"}`} />
+                                                <Star key={i} className={`w-3 h-3 ${i < rating ? "fill-current" : "text-neutral-300"}`} />
                                             ))}
                                         </div>
-                                        <p className="text-neutral-600 italic text-sm mb-1">"{review.comment}"</p>
-                                        <p className="text-xs font-bold text-neutral-400">- {review.user}</p>
+                                        <p className="text-neutral-600 italic text-sm mb-1">"{comment}"</p>
+                                        <p className="text-xs font-bold text-neutral-400">- {user}</p>
                                     </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </div>
                     )}

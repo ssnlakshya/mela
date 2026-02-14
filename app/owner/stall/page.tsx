@@ -51,6 +51,8 @@ type GalleryItem = {
   status: "uploading" | "done" | "error";
 };
 
+const denyMessage = "for that you have put stall next year";
+
 function createId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
@@ -312,7 +314,7 @@ export default function StallOwnerPage() {
         if (response.status === 403) {
           // Email not in allowlist
           await supabase.auth.signOut();
-          setStatusMessage("For that you have to put a stall. See you next year bye bye 👋");
+          setStatusMessage(denyMessage);
           setOwnerEmail(null);
           setIsLoading(false);
           return;
@@ -767,6 +769,7 @@ export default function StallOwnerPage() {
   }
 
   if (!ownerEmail) {
+    const isDenied = statusMessage === denyMessage;
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-4 text-center">
         <h1 className="text-2xl font-semibold text-neutral-900">
@@ -774,17 +777,17 @@ export default function StallOwnerPage() {
         </h1>
         {statusMessage && (
           <p className={`max-w-md text-sm ${
-            statusMessage.includes("bye bye")
+            isDenied
               ? "text-orange-600 font-medium"
               : "text-neutral-600"
           }`}>{statusMessage}</p>
         )}
         <button
           type="button"
-          onClick={() => router.push("/login")}
+          onClick={() => router.push(isDenied ? "/" : "/login")}
           className="rounded-full bg-neutral-900 px-6 py-3 text-sm font-semibold text-white"
         >
-          Go to login
+          {isDenied ? "Go to home" : "Go to login"}
         </button>
       </div>
     );
@@ -1349,7 +1352,7 @@ export default function StallOwnerPage() {
               </div>
               {statusMessage && (
                 <p className={`mt-4 rounded-xl border px-4 py-3 text-sm ${
-                  statusMessage.includes("bye bye")
+                  statusMessage === denyMessage
                     ? "border-orange-200 bg-orange-50 text-orange-700"
                     : "border-neutral-100 bg-neutral-50 text-neutral-700"
                 }`}>
